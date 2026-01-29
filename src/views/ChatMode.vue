@@ -237,11 +237,20 @@ const handleSend = () => {
              // Ensure content fallback
              const finalContent = sampleReportContent || '# 报告生成失败\n样本内容未能正确加载。';
              
+             // Collect sources from user messages
+             const allSources = [];
+             messages.value.forEach(msg => {
+                 if (msg.role === 'user' && msg.files && msg.files.length > 0) {
+                     msg.files.forEach(f => allSources.push(f.name));
+                 }
+             });
+
              const newReport = {
                 id: newReportId,
                 title: '2024年度领导班子民主生活会征求意见建议情况报告',
                 create_time: new Date().toLocaleDateString(),
-                content: finalContent
+                content: finalContent,
+                sources: allSources
              };
              store.addReport(newReport);
              
