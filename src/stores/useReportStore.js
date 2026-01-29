@@ -111,6 +111,7 @@ export const useReportStore = defineStore('report', () => {
             id: 'rpt_001',
             title: 'L92井 完井测井解释及油气评价综合报告',
             create_time: '2026-01-20',
+            sources: ['L92_well_logging_data.pdf', 'L92_geological_survey.docx'],
             content: `# L92井 完井测井解释及油气评价综合报告
 ## 第一章 井况概查与地质背景
 ### 1.1 基础井情表

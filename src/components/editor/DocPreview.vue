@@ -23,16 +23,16 @@ const htmlContent = computed(() => renderMarkdown(props.content));
       ></div>
 
       <!-- Sources Display (Bottom) -->
-      <div v-if="props.sources && props.sources.length > 0" class="mt-16 pt-8 border-t border-dashed border-gray-200 print:hidden">
-          <div class="text-xs font-bold text-gray-400 mb-3 flex items-center gap-1.5 uppercase tracking-wider">
-             <Icon icon="ri:links-line" /> 报告参考来源
-          </div>
-          <div class="flex flex-col gap-2">
-             <div v-for="(file, idx) in props.sources" :key="idx" class="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded border border-gray-100 w-fit">
-                <Icon icon="ri:file-word-line" class="text-blue-500" />
-                <span class="font-mono">{{ file }}</span>
-             </div>
-          </div>
+      <div v-if="props.sources && props.sources.length > 0" class="mt-12 pt-8 border-t border-dashed border-gray-200 print:hidden">
+         <div class="text-xs font-bold text-gray-400 mb-4 flex items-center gap-1.5 ">
+            <Icon icon="ri:links-line" /> 报告参考来源
+         </div>
+         <div class="flex flex-col gap-2">
+            <div v-for="(file, idx) in props.sources" :key="idx" class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 px-3 py-2.5 rounded border border-gray-100 max-w-md">
+               <Icon icon="ri:file-text-line" class="text-blue-500 text-lg" />
+               <span class="font-medium truncate">{{ file }}</span>
+            </div>
+         </div>
       </div>
     </div>
   </div>
