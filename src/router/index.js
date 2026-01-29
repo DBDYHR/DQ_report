@@ -33,6 +33,11 @@ const routes = [
         component: ReportWizard
     },
     {
+        path: '/new-report',
+        name: 'NewReport',
+        component: () => import('../views/NewReportView.vue')
+    },
+    {
         path: '/editor/:id', // :id 是动态参数，代表报告ID
         name: 'Editor',
         component: EditorView

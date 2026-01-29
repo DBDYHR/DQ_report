@@ -1,11 +1,11 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useReportStore } from '../stores/useReportStore';
 import { Icon } from '@iconify/vue';
 import DocPreview from '../components/editor/DocPreview.vue';
-// 1. 确保引入了 AI 组件
 import AiAssistant from '../components/editor/AiAssistant.vue';
+import ReportEditorView from './ReportEditorView.vue';
 import { asBlob } from 'html-docx-js-typescript';
 import { saveAs } from 'file-saver';
 import { renderMarkdown } from '../utils/markdown';
@@ -13,6 +13,26 @@ import { renderMarkdown } from '../utils/markdown';
 const route = useRoute();
 const router = useRouter();
 const store = useReportStore();
+
+// 判断是模板编辑还是报告编辑
+const isTemplateMode = computed(() => route.query.mode === 'template');
+const isReportMode = computed(() => {
+  // 如果明确是模板模式，使用模板编辑器
+  if (isTemplateMode.value) return false;
+  
+  // 先检查是否是模板（通过ID查找）
+  let isTemplate = false;
+  store.templates.forEach(cat => {
+    if (cat.list.find(t => t.id === route.params.id)) {
+      isTemplate = true;
+    }
+  });
+  // 如果是模板，使用模板编辑器
+  if (isTemplate) return false;
+  
+  // 其他情况（报告）都使用报告编辑器（对话式）
+  return true;
+});
 
 // 状态
 const currentId = ref(route.params.id);
@@ -148,7 +168,11 @@ const goBack = () => {
 </script>
 
 <template>
-  <div class="flex h-full w-full bg-white overflow-hidden">
+  <!-- 报告编辑模式：使用新的对话式编辑器 -->
+  <ReportEditorView v-if="isReportMode" />
+  
+  <!-- 模板编辑模式：保持原有风格 -->
+  <div v-else class="flex h-full w-full bg-white overflow-hidden">
     
     <div class="w-1/2 flex flex-col border-r border-gray-200 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
       

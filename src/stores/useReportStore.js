@@ -133,6 +133,9 @@ L92井位于准噶尔盆地腹部的莫西庄凸起构造带上。本次钻探�
     // 3. 上传的文件列表 (Wizard向导用)
     const uploadedFiles = ref([])
 
+    // 4. 未保存的草稿报告（新建报告不入库，仅手动保存后入库）
+    const draftReport = ref(null)
+
     // ================= 动作 (Actions) =================
 
     // 添加新报告
@@ -195,16 +198,29 @@ L92井位于准噶尔盆地腹部的莫西庄凸起构造带上。本次钻探�
         return reports.value.find(r => r.id === id)
     }
 
+    // 设置草稿（新建报告时调用，不入库）
+    function setDraftReport(draft) {
+        draftReport.value = draft
+    }
+
+    // 清除草稿（保存到库或取消时调用）
+    function clearDraftReport() {
+        draftReport.value = null
+    }
+
     return {
         templates,
         reports,
         uploadedFiles,
+        draftReport,
         addReport,
         updateReport,
         addTemplate,
         updateTemplate,
         deleteReport,
         deleteTemplate,
-        getReportById
+        getReportById,
+        setDraftReport,
+        clearDraftReport
     }
 })

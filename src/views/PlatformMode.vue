@@ -10,11 +10,11 @@
       </div>
       
       <button 
-        @click="$router.push('/wizard')"
+        @click="$router.push('/new-report')"
         class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5"
       >
         <Icon icon="ri:sparkling-2-fill" class="text-lg" />
-        新建写作任务
+        新建报告
       </button>
     </div>
 

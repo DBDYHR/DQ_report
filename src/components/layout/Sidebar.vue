@@ -27,11 +27,11 @@ const isActive = (path) => route.path === path;
       
       <div class="px-4">
         <button 
-          @click="navigateTo('/chat')"
+          @click="navigateTo('/new-report')"
           class="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all font-medium text-sm group"
         >
           <Icon icon="material-symbols:add-rounded" class="text-xl text-slate-500 group-hover:text-slate-800" />
-          开启新报告
+          新建报告
         </button>
       </div>
 
