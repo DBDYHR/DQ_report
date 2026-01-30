@@ -5,7 +5,9 @@ import { Icon } from '@iconify/vue';
 import { useReportStore } from '../stores/useReportStore';
 import DocPreview from '../components/editor/DocPreview.vue';
 import { parseFile } from '../utils/fileParser';
-import sampleReportContent from '../assets/sample.txt?raw';
+import { renderMarkdown } from '../utils/markdown';
+import openSample from '../assets/open_sample.txt?raw';
+import professionalSample from '../assets/professional_sample.txt?raw';
 
 const router = useRouter();
 const store = useReportStore();
@@ -210,20 +212,36 @@ const handleSend = () => {
     isThinking.value = false;
     
     // 3. 给出分析结果 (Hardcoded)
+    // 3. 给出分析结果 (根据模式区分)
+    let aiResponseContent = '';
+    
+    if (reportMode.value === 'pro') {
+        aiResponseContent = `已收到您的资料。经过深度智能分析，系统为您提取到以下关键维度：\n
+报告主题：新技术应用及解释成果分析报告\n
+分析对象：XX 预探井测井数据、新技术应用及解释成果\n
+核心剖析维度：\n
+新技术应用：聚焦 CMR 磁共振成像测井技术，剖析其在流体区分、孔隙结构识别中的应用成效。\n
+解释成果：汇总测井解释层分类数据，查摆不同层位（油层、差油层、水层）的核心特征差异。\n
+成果验证：结合邻井试油数据，验证本井解释成果的准确性，分析储层整体油气潜能。\n
+优化建议：基于分析结果，提出试油、开发管控及参数标定的针对性改进建议。\n
+系统已基于 “专业模式” 为您构建了严谨的逻辑框架，正在跳转至编辑器...
+`;
+    } else {
+        // Open Mode (Default)
+        aiResponseContent = `已收到您的资料。经过智能分析，为您提取到以下关键信息：\n
+**报告主题**：2024年度领导班子民主生活会征求意见建议情况\n
+**来源部门**：应用软件研究室\n
+**核心分析维度**：\n
+1. **政治纪律**：需加强理论学习深度，完善监督机制。\n
+2. **党性作风**：需强化条例宣传，完善廉政长效监管。\n
+3. **责任担当**：需加强廉洁教育系统性，优化任务分配机制。\n
+4. **从严治党**：需提升政治责任领悟，增强网络主动发声意识。\n
+系统已根据分析结果为您生成草稿，正在跳转至编辑器...`;
+    }
+
     messages.value.push({ 
       role: 'ai', 
-      content: `已收到您的资料。经过智能分析，为您提取到以下关键信息：
-
-**报告主题**：2024年度领导班子民主生活会征求意见建议情况
-**来源部门**：应用软件研究室
-
-**核心分析维度**：
-1. **政治纪律**：需加强理论学习深度，完善监督机制。
-2. **党性作风**：需强化条例宣传，完善廉政长效监管。
-3. **责任担当**：需加强廉洁教育系统性，优化任务分配机制。
-4. **从严治党**：需提升政治责任领悟，增强网络主动发声意识。
-
-系统已根据分析结果为您生成草稿，正在跳转至编辑器...` 
+      content: aiResponseContent
     });
     scrollToBottom();
     
@@ -243,8 +261,11 @@ const handleSend = () => {
        setTimeout(() => {
            try {
              const newReportId = 'rpt_' + Date.now();
+             // Select content based on mode
+             let selectedContent = reportMode.value === 'pro' ? professionalSample : openSample;
+
              // Ensure content fallback
-             const finalContent = sampleReportContent || '# 报告生成失败\n样本内容未能正确加载。';
+             const finalContent = selectedContent || '# 报告生成失败\n样本内容未能正确加载。';
              
              // Collect sources from user messages
              const allSources = [];
@@ -314,7 +335,7 @@ const onKeydown = (e) => {
             <Icon icon="ri:robot-2-line" class="text-lg" />
           </div>
           <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
-            <p class="text-sm leading-relaxed text-slate-700">{{ msg.content }}</p>
+            <div class="text-sm leading-relaxed text-slate-700 markdown-content" v-html="renderMarkdown(msg.content)"></div>
           </div>
         </div>
 
@@ -587,5 +608,30 @@ const onKeydown = (e) => {
   0% { transform: translateX(-100%); }
   50% { transform: translateX(0%); }
   100% { transform: translateX(100%); }
+}
+
+/* Markdown Styles for Chat */
+.markdown-content :deep(p) {
+  margin-bottom: 0.5em;
+}
+.markdown-content :deep(p):last-child {
+  margin-bottom: 0;
+}
+.markdown-content :deep(strong) {
+  font-weight: 600;
+  color: #334155; /* slate-700 darker */
+}
+.markdown-content :deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.25em;
+  margin: 0.5em 0;
+}
+.markdown-content :deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.25em;
+  margin: 0.5em 0;
+}
+.markdown-content :deep(li) {
+  margin-bottom: 0.25em;
 }
 </style>
