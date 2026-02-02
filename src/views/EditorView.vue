@@ -102,7 +102,7 @@ const handleExport = async () => {
       h1 { font-size: 22pt; font-weight: bold; text-align: center; margin: 24pt 0 18pt 0; }
       h2 { font-size: 16pt; font-weight: bold; margin: 18pt 0 12pt 0; border-bottom: 1px solid #000; padding-bottom: 4pt; }
       h3 { font-size: 14pt; font-weight: bold; margin: 12pt 0 6pt 0; }
-      p { margin-bottom: 10pt; text-align: justify; text-indent: 2em; }
+      p { margin-bottom: 10pt; text-align: left; }
       table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
       td, th { border: 1px solid #000; padding: 6pt; text-align: center; }
       blockquote { border-left: 4px solid #ccc; padding-left: 10pt; margin: 10pt 0; color: #666; }
