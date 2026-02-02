@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick, onMounted } from 'vue';
+import { ref, nextTick, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Icon } from '@iconify/vue';
 import { useReportStore } from '../stores/useReportStore';
@@ -8,6 +8,8 @@ import { parseFile } from '../utils/fileParser';
 import { renderMarkdown } from '../utils/markdown';
 import openSample from '../assets/open_sample.txt?raw';
 import professionalSample from '../assets/professional_sample.txt?raw';
+import openAiResponse from '../assets/open_aiResponseContent.txt?raw';
+import professionalAiResponse from '../assets/professional_aiResponseContent.txt?raw';
 
 const router = useRouter();
 const store = useReportStore();
@@ -132,6 +134,22 @@ const handleSelectMode = (mode) => {
     showModeSelector.value = false;
 };
 
+// Web Search Logic
+const isWebSearchEnabled = ref(true);
+
+watch(reportMode, (newMode) => {
+    if (newMode === 'open') {
+        isWebSearchEnabled.value = true;
+    } else {
+        isWebSearchEnabled.value = false;
+    }
+});
+
+const toggleWebSearch = () => {
+    if (reportMode.value === 'pro') return;
+    isWebSearchEnabled.value = !isWebSearchEnabled.value;
+};
+
 const openFilePreview = async (file) => {
     previewTitle.value = file.name;
 
@@ -208,47 +226,49 @@ const handleSend = () => {
   // 2. AI 思考演示 (设置延时)
   isThinking.value = true;
   
-  setTimeout(() => {
-    isThinking.value = false;
-    
-    // 3. 给出分析结果 (Hardcoded)
-    // 3. 给出分析结果 (根据模式区分)
-    let aiResponseContent = '';
-    
-    if (reportMode.value === 'pro') {
-        aiResponseContent = `已收到您的资料。经过深度智能分析，系统为您提取到以下关键维度：\n
-报告主题：新技术应用及解释成果分析报告\n
-分析对象：XX 预探井测井数据、新技术应用及解释成果\n
-核心剖析维度：\n
-新技术应用：聚焦 CMR 磁共振成像测井技术，剖析其在流体区分、孔隙结构识别中的应用成效。\n
-解释成果：汇总测井解释层分类数据，查摆不同层位（油层、差油层、水层）的核心特征差异。\n
-成果验证：结合邻井试油数据，验证本井解释成果的准确性，分析储层整体油气潜能。\n
-优化建议：基于分析结果，提出试油、开发管控及参数标定的针对性改进建议。\n
-系统已基于 “专业模式” 为您构建了严谨的逻辑框架，正在跳转至编辑器...
-`;
-    } else {
-        // Open Mode (Default)
-        aiResponseContent = `已收到您的资料。经过智能分析，为您提取到以下关键信息：\n
-**报告主题**：2024年度领导班子民主生活会征求意见建议情况\n
-**来源部门**：应用软件研究室\n
-**核心分析维度**：\n
-1. **政治纪律**：需加强理论学习深度，完善监督机制。\n
-2. **党性作风**：需强化条例宣传，完善廉政长效监管。\n
-3. **责任担当**：需加强廉洁教育系统性，优化任务分配机制。\n
-4. **从严治党**：需提升政治责任领悟，增强网络主动发声意识。\n
-系统已根据分析结果为您生成草稿，正在跳转至编辑器...`;
-    }
-
-    messages.value.push({ 
-      role: 'ai', 
-      content: aiResponseContent
-    });
-    scrollToBottom();
-    
-    // 4. 触发生成流程
     setTimeout(() => {
-       isGenerating.value = true;
-       generationStep.value = '正在构建文档结构...';
+        isThinking.value = false;
+        
+        let aiResponseContent = '';
+        if (reportMode.value === 'pro') {
+            aiResponseContent = professionalAiResponse;
+        } else {
+            aiResponseContent = openAiResponse;
+        }
+
+        // Initialize empty AI message
+        const aiMsg = { 
+            role: 'ai', 
+            content: '' // Start empty
+        };
+        messages.value.push(aiMsg);
+        
+        // Get the reactive proxy from the array
+        const reactiveMsg = messages.value[messages.value.length - 1];
+
+        // Streaming Logic
+        let i = 0;
+        const speed = 60; // ms per char (faster)
+        const totalLength = aiResponseContent.length;
+        
+        const typeWriter = setInterval(() => {
+            // Write a chunk (can be 1 char or more if needed for speed)
+            if (reactiveMsg) {
+                reactiveMsg.content += aiResponseContent.charAt(i);
+            }
+            i++;
+
+            // Auto scroll every few chars to reduce layout trashing
+            if (i % 10 === 0) scrollToBottom();
+
+            if (i >= totalLength) {
+                clearInterval(typeWriter);
+                scrollToBottom();
+
+                // 4. 触发生成流程 (Wait a bit for user to read)
+                setTimeout(() => {
+                   isGenerating.value = true;
+                   generationStep.value = '正在构建文档结构...';
        
        setTimeout(() => {
            generationStep.value = '正在应用行业标准样式...';
@@ -301,7 +321,9 @@ const handleSend = () => {
            }
        }, 2200);
 
-    }, 2500);
+                }, 2000); 
+            }
+        }, 15);
 
   }, 3000); // 模拟 3秒 思考时间
 };
@@ -453,6 +475,20 @@ const onKeydown = (e) => {
               >
                 <Icon icon="ri:layout-grid-line" class="text-lg text-slate-400 group-hover:text-blue-500" />
                 <span>从模板库选择</span>
+              </button>
+
+              <button 
+                @click="toggleWebSearch"
+                :disabled="reportMode === 'pro'"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border border-transparent group"
+                :class="[
+                    reportMode === 'pro' ? 'opacity-50 cursor-not-allowed text-slate-400' : 
+                    isWebSearchEnabled ? 'text-blue-600 bg-blue-50/50 hover:bg-blue-50 border-blue-100' : 'text-slate-600 hover:bg-slate-50 hover:border-slate-200'
+                ]"
+                :title="reportMode === 'pro' ? '专业模式下不可用' : '开启联网搜索以获取最新信息'"
+              >
+                <Icon icon="ri:global-line" class="text-lg" :class="isWebSearchEnabled && reportMode !== 'pro' ? 'text-blue-500' : 'text-slate-400 group-hover:text-blue-500'" />
+                <span>联网搜索</span>
               </button>
               
 

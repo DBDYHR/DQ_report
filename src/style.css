@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../node_modules/katex/dist/katex.min.css";
 
 /* 保持你的自定义样式在下面 */
 .hide-scrollbar::-webkit-scrollbar {
@@ -8,4 +9,14 @@
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* 即使使用了正确的 CSS，针对 Tailwind 仍需做少量防御性重置 */
+.katex {
+  font-size: 1.1em;
+}
+
+.katex * {
+  line-height: normal;
+  /* 防止父级行高继承 */
 }
