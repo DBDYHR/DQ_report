@@ -248,18 +248,21 @@ const handleSend = () => {
 
         // Streaming Logic
         let i = 0;
-        const speed = 60; // ms per char (faster)
+        const speed = 65; // ms per tick
         const totalLength = aiResponseContent.length;
         
         const typeWriter = setInterval(() => {
-            // Write a chunk (can be 1 char or more if needed for speed)
+            // Randomly output 3-10 characters to simulate token chunks
+            const chunkSize = Math.floor(Math.random() * 8) + 3; // 3 to 10
+            const currentChunk = aiResponseContent.substring(i, i + chunkSize);
+            
             if (reactiveMsg) {
-                reactiveMsg.content += aiResponseContent.charAt(i);
+                reactiveMsg.content += currentChunk;
             }
-            i++;
+            i += chunkSize;
 
-            // Auto scroll every few chars to reduce layout trashing
-            if (i % 10 === 0) scrollToBottom();
+            // Auto scroll always for smooth experience with chunks
+            scrollToBottom();
 
             if (i >= totalLength) {
                 clearInterval(typeWriter);
@@ -323,7 +326,7 @@ const handleSend = () => {
 
                 }, 2000); 
             }
-        }, 15);
+        }, speed);
 
   }, 3000); // 模拟 3秒 思考时间
 };
