@@ -277,7 +277,7 @@ const handleSend = () => {
 
              const newReport = {
                 id: newReportId,
-                title: '2024年度领导班子民主生活会征求意见建议情况报告',
+                title: '新建报告',
                 create_time: new Date().toLocaleDateString(),
                 content: finalContent,
                 sources: allSources

@@ -7,17 +7,17 @@ export const useReportStore = defineStore('report', () => {
     // 1. 模板数据 (来自原 HTML templateCategories)
     const templates = ref([
         {
-            name: "测井解释报告",
+            name: "地质勘探报告",
             list: [
                 {
                     id: 'tpl_log_001',
-                    title: '测井解释报告模板1',
+                    title: '地质勘探报告模板1',
                     create_time: '2026-01-20',
                     content: `# 地质勘测报告\n## 第一章 井况概查与地质背景\n### 1.1 基础井情\n### 1.2 区域地质背景与钻探目的\n## 第二章 测井资料采集与质量控制\n### 2.1 测井作业综述\n### 2.2 环境影响校正与质量评定\n## 第三章 地层划分与岩性矿物分析\n### 3.1 地层分层综述\n### 3.2 岩性电性特征描述\n## 第四章 储层参数计算模型与解释方法\n### 4.1 泥质含量计算\n### 4.2 孔隙度计算\n### 4.3 含油饱和度计算\n## 第五章 油气层综合解释成果\n### 5.1 典型层位详细评价\n### 5.2 解释成果汇总表\n## 第六章 结论与试油建议`
                 },
                 {
                     id: 'tpl_log_002',
-                    title: '测井解释报告模板2',
+                    title: '地质勘探报告模板2',
                     create_time: '2026-01-20',
                     content: `# 报告模板
 
@@ -317,7 +317,7 @@ export const useReportStore = defineStore('report', () => {
 1. **处理解释参数符号说明：** RHOB-密度，NPHI-中子孔隙度，DT-声波时差，RT-深感应电阻率，UOIL-油相端点值。
 2. **成果图展示：**
 
-![图1-解释成果图](/填充.jpg)`
+![图1-解释成果图](/image.jpg)`
         }
     ])
 
