@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { listReports, createReport as createReportApi, updateReport as updateReportApi, deleteReport as deleteReportApi } from '../api/reports'
 
 export const useReportStore = defineStore('report', () => {
     // ================= 状态 (State) =================
@@ -200,7 +201,7 @@ export const useReportStore = defineStore('report', () => {
         }
     ])
 
-    // 2. 报告数据 (来自原 HTML reports)
+    // 2. 报告数据 (来自原 HTML reports + 后端)
     const reports = ref([
         {
             id: 'rpt_001',
@@ -321,21 +322,81 @@ export const useReportStore = defineStore('report', () => {
         }
     ])
 
+    // 标记是否已从后端初始化过
+    const reportsInitialized = ref(false)
+
     // 3. 上传的文件列表 (Wizard向导用)
     const uploadedFiles = ref([])
 
     // ================= 动作 (Actions) =================
 
-    // 添加新报告
+    // 从后端初始化报告列表（并在第一次时可将内置示例同步到后端）
+    async function initReports() {
+        if (reportsInitialized.value) return
+        reportsInitialized.value = true
+
+        try {
+            const backendReports = await listReports()
+
+            if (backendReports && backendReports.length > 0) {
+                // 用后端数据覆盖当前本地 reports
+                reports.value = backendReports.map(r => ({
+                    id: r.id,
+                    title: r.title,
+                    create_time: r.create_time || new Date().toLocaleDateString(),
+                    content: r.content,
+                    sources: r.sources || []
+                }))
+            } else if (reports.value.length > 0) {
+                // 后端为空且本地有示例数据：将示例同步到后端一次
+                const seeded = []
+                for (const r of reports.value) {
+                    try {
+                        const created = await createReportApi({
+                            title: r.title,
+                            type: 'open_report',
+                            content: r.content,
+                            sources: r.sources || []
+                        })
+                        seeded.push({
+                            id: created.id,
+                            title: created.title,
+                            create_time: created.create_time || r.create_time || new Date().toLocaleDateString(),
+                            content: created.content,
+                            sources: created.sources || r.sources || []
+                        })
+                    } catch (e) {
+                        console.error('同步示例报告到后端失败:', e)
+                    }
+                }
+                if (seeded.length > 0) {
+                    reports.value = seeded
+                }
+            }
+        } catch (e) {
+            console.error('初始化报告列表失败，将继续使用内置示例数据:', e)
+        }
+    }
+
+    // 添加新报告（假定已在别处通过后端创建，这里主要同步到前端）
     function addReport(newReport) {
         reports.value.unshift(newReport)
     }
 
-    // 更新报告
-    function updateReport(id, data) {
+    // 更新报告（先更新前端，再尽量同步到后端）
+    async function updateReport(id, data) {
         const report = reports.value.find(r => r.id === id)
         if (report) {
             Object.assign(report, data)
+            try {
+                await updateReportApi(id, {
+                    title: report.title,
+                    content: report.content,
+                    sources: report.sources || []
+                })
+            } catch (e) {
+                console.error('同步报告到后端失败:', e)
+            }
         }
     }
 
@@ -368,9 +429,14 @@ export const useReportStore = defineStore('report', () => {
         }
     }
 
-    // 删除报告
-    function deleteReport(id) {
-        reports.value = reports.value.filter(r => r.id !== id)
+    // 删除报告（先请求后端，再从前端移除）
+    async function deleteReport(id) {
+        try {
+            await deleteReportApi(id)
+            reports.value = reports.value.filter(r => r.id !== id)
+        } catch (e) {
+            console.error('删除报告失败:', e)
+        }
     }
 
     // 删除模板
@@ -389,6 +455,7 @@ export const useReportStore = defineStore('report', () => {
     return {
         templates,
         reports,
+        initReports,
         uploadedFiles,
         addReport,
         updateReport,

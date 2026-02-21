@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 环境与密钥（上传 GitHub 勿提交）
+server/.env
+.env
+.env.local

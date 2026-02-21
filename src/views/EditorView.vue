@@ -203,7 +203,7 @@ const goBack = () => {
         </div>
 
         <div class="h-[280px] shrink-0 z-20 pt-2">
-          <AiAssistant v-model="content" />
+          <AiAssistant v-model="content" :title="title" />
         </div>
       </div>
     </div>

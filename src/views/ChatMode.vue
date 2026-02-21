@@ -10,6 +10,9 @@ import openSample from '../assets/open_sample.txt?raw';
 import professionalSample from '../assets/professional_sample.txt?raw';
 import openAiResponse from '../assets/open_aiResponseContent.txt?raw';
 import professionalAiResponse from '../assets/professional_aiResponseContent.txt?raw';
+import { uploadFile } from '../api/files';
+import { generateOpenReport, searchForReport } from '../api/ai';
+import { createReport } from '../api/reports';
 
 const router = useRouter();
 const store = useReportStore();
@@ -204,7 +207,7 @@ const autoResize = () => {
 };
 
 // 发送消息
-const handleSend = () => {
+const handleSend = async () => {
   const text = inputValue.value.trim();
   // Allow sending if text exists OR files exist
   if (!text && uploadedFiles.value.length === 0) return;
@@ -216,119 +219,279 @@ const handleSend = () => {
     files: [...uploadedFiles.value]
   });
   
+  const sentFiles = [...uploadedFiles.value];
   inputValue.value = '';
   uploadedFiles.value = []; // Clear files after send
   
   // 重置高度
   if (textareaRef.value) textareaRef.value.style.height = 'auto';
-  scrollToBottom();
+  await scrollToBottom();
 
-  // 2. AI 思考演示 (设置延时)
-  isThinking.value = true;
-  
+  // 专业模式仍使用本地示例逻辑
+  if (reportMode.value === 'pro') {
+    isThinking.value = true;
+
     setTimeout(() => {
-        isThinking.value = false;
-        
-        let aiResponseContent = '';
-        if (reportMode.value === 'pro') {
-            aiResponseContent = professionalAiResponse;
-        } else {
-            aiResponseContent = openAiResponse;
+      isThinking.value = false;
+
+      let aiResponseContent = professionalAiResponse;
+
+      const aiMsg = {
+        role: 'ai',
+        content: '',
+      };
+      messages.value.push(aiMsg);
+      const reactiveMsg = messages.value[messages.value.length - 1];
+
+      let i = 0;
+      const speed = 65;
+      const totalLength = aiResponseContent.length;
+
+      const typeWriter = setInterval(() => {
+        const chunkSize = Math.floor(Math.random() * 8) + 3;
+        const currentChunk = aiResponseContent.substring(i, i + chunkSize);
+
+        if (reactiveMsg) {
+          reactiveMsg.content += currentChunk;
+        }
+        i += chunkSize;
+        scrollToBottom();
+
+        if (i >= totalLength) {
+          clearInterval(typeWriter);
+          scrollToBottom();
+
+          setTimeout(() => {
+            isGenerating.value = true;
+            generationStep.value = '正在构建文档结构...';
+
+            setTimeout(() => {
+              generationStep.value = '正在应用行业标准样式...';
+            }, 800);
+
+            setTimeout(() => {
+              generationStep.value = '正在生成智能摘要...';
+            }, 1600);
+
+            setTimeout(() => {
+              try {
+                const newReportId = 'rpt_' + Date.now();
+                let selectedContent = professionalSample;
+                const finalContent =
+                  selectedContent ||
+                  '# 报告生成失败\n样本内容未能正确加载。';
+
+                const allSources = [];
+                messages.value.forEach(msg => {
+                  if (msg.role === 'user' && msg.files && msg.files.length > 0) {
+                    msg.files.forEach(f => allSources.push(f.name));
+                  }
+                });
+
+                const newReport = {
+                  id: newReportId,
+                  title: '新建报告',
+                  create_time: new Date().toLocaleDateString(),
+                  content: finalContent,
+                  sources: allSources,
+                };
+                store.addReport(newReport);
+
+                router.push(`/editor/${newReportId}`).catch(err => {
+                  console.error('Navigation error:', err);
+                  isGenerating.value = false;
+                  alert('页面跳转失败: ' + err.message);
+                });
+              } catch (e) {
+                console.error('Report creation failed:', e);
+                isGenerating.value = false;
+                alert('报告创建异常: ' + e.message);
+              }
+            }, 2200);
+          }, 2000);
+        }
+      }, speed);
+    }, 3000);
+
+    return;
+  }
+
+  // 开放模式：接入后端文件上传 + AI + 报告创建
+  isThinking.value = true;
+
+  try {
+    // 1. 上传所有真实文件，获取 materials
+    const uploadTargets = sentFiles.filter(f => f.file);
+    const uploadResults = await Promise.all(
+      uploadTargets.map(f => uploadFile(f.file)),
+    );
+
+    const materials = uploadResults.map(r => ({
+      file_id: r.file_id,
+      name: r.name,
+      text: r.summary || r.text || '',
+    }));
+
+    const title =
+      text && text.length <= 50 ? text : '新建开放报告';
+
+    const basePayload = {
+      task_type: 'open_report',
+      title,
+      outline: null,
+      draft: '',
+      materials,
+      user_config: {
+        instruction: text || '请基于以上材料生成一篇开放报告。',
+        web_search_enabled: isWebSearchEnabled.value,
+      },
+    };
+
+    // 2a. 若开启联网搜索：先检索，展示结果，等待用户确认后再生成
+    if (isWebSearchEnabled.value) {
+      const searchData = await searchForReport(basePayload);
+      isThinking.value = false;
+
+      messages.value.push({
+        role: 'ai',
+        content: `已根据「${searchData.query}」检索到 **${searchData.results.length}** 条结果，请确认后生成报告。`,
+        searchResults: searchData,
+        pendingContext: {
+          title,
+          basePayload,
+          sentFiles: [...sentFiles],
+        },
+      });
+      await scrollToBottom();
+      return;
+    }
+
+    // 2b. 未开联网搜索：直接生成
+    const { content } = await generateOpenReport(basePayload);
+    isThinking.value = false;
+
+    // 3. 生成过场动画 + 创建报告并跳转
+    isGenerating.value = true;
+    generationStep.value = '正在构建文档结构...';
+
+    setTimeout(() => {
+      generationStep.value = '正在应用行业标准样式...';
+    }, 800);
+
+    setTimeout(() => {
+      generationStep.value = '正在生成智能摘要...';
+    }, 1600);
+
+    // 在最后阶段创建报告并跳转
+    setTimeout(async () => {
+      try {
+        const allSources = [];
+        sentFiles.forEach(f => {
+          if (f.name) allSources.push(f.name);
+        });
+
+        const report = await createReport({
+          title,
+          type: 'open_report',
+          content:
+            content ||
+            '# 空报告\nAI 未返回任何内容，请稍后重试或手动编辑。',
+          sources: allSources,
+        });
+
+        // 同步到前端 store，方便后续列表等使用
+        if (report && report.id) {
+          // 简单兼容后端时间字段
+          store.addReport({
+            id: report.id,
+            title: report.title,
+            create_time:
+              report.create_time || new Date().toLocaleDateString(),
+            content: report.content,
+            sources: report.sources || [],
+          });
         }
 
-        // Initialize empty AI message
-        const aiMsg = { 
-            role: 'ai', 
-            content: '' // Start empty
-        };
-        messages.value.push(aiMsg);
-        
-        // Get the reactive proxy from the array
-        const reactiveMsg = messages.value[messages.value.length - 1];
+        await router.push(`/editor/${report.id}`);
+      } catch (e) {
+        console.error('开放报告创建失败:', e);
+        isGenerating.value = false;
+        messages.value.push({
+          role: 'ai',
+          content: `报告创建失败，请稍后重试。\n\n错误信息：${e.message || e}`,
+        });
+        await scrollToBottom();
+      }
+    }, 2200);
+  } catch (e) {
+    console.error('开放模式调用失败:', e);
+    isThinking.value = false;
+    isGenerating.value = false;
+    messages.value.push({
+      role: 'ai',
+      content: `调用后端失败，请检查网络或稍后重试。\n\n错误信息：${e.message || e}`,
+    });
+    await scrollToBottom();
+  }
+};
 
-        // Streaming Logic
-        let i = 0;
-        const speed = 65; // ms per tick
-        const totalLength = aiResponseContent.length;
-        
-        const typeWriter = setInterval(() => {
-            // Randomly output 3-10 characters to simulate token chunks
-            const chunkSize = Math.floor(Math.random() * 8) + 3; // 3 to 10
-            const currentChunk = aiResponseContent.substring(i, i + chunkSize);
-            
-            if (reactiveMsg) {
-                reactiveMsg.content += currentChunk;
-            }
-            i += chunkSize;
+// 确认检索结果并生成报告（带检索内容）
+const confirmAndGenerate = async (msg) => {
+  if (!msg?.searchResults || !msg?.pendingContext) return;
+  await doGenerateReport(msg, true);
+};
 
-            // Auto scroll always for smooth experience with chunks
-            scrollToBottom();
+// 不使用检索结果，直接生成
+const confirmWithoutSearch = async (msg) => {
+  if (!msg?.searchResults || !msg?.pendingContext) return;
+  await doGenerateReport(msg, false);
+};
 
-            if (i >= totalLength) {
-                clearInterval(typeWriter);
-                scrollToBottom();
+const doGenerateReport = async (msg, useSearchResults) => {
+  const { title, basePayload, sentFiles } = msg.pendingContext;
+  const searchData = msg.searchResults;
 
-                // 4. 触发生成流程 (Wait a bit for user to read)
-                setTimeout(() => {
-                   isGenerating.value = true;
-                   generationStep.value = '正在构建文档结构...';
-       
-       setTimeout(() => {
-           generationStep.value = '正在应用行业标准样式...';
-       }, 800);
+  isGenerating.value = true;
+  generationStep.value = '正在构建文档结构...';
 
-       setTimeout(() => {
-           generationStep.value = '正在生成智能摘要...';
-       }, 1600);
+  try {
+    const payload = useSearchResults
+      ? { ...basePayload, search_results: { query: searchData.query, results: searchData.results } }
+      : { ...basePayload, search_results: { query: '', results: [] } };
+    const { content } = await generateOpenReport(payload);
 
-       setTimeout(() => {
-           try {
-             const newReportId = 'rpt_' + Date.now();
-             // Select content based on mode
-             let selectedContent = reportMode.value === 'pro' ? professionalSample : openSample;
+    generationStep.value = '正在应用行业标准样式...';
+    await new Promise(r => setTimeout(r, 800));
+    generationStep.value = '正在生成智能摘要...';
+    await new Promise(r => setTimeout(r, 800));
 
-             // Ensure content fallback
-             const finalContent = selectedContent || '# 报告生成失败\n样本内容未能正确加载。';
-             
-             // Collect sources from user messages
-             const allSources = [];
-             messages.value.forEach(msg => {
-                 if (msg.role === 'user' && msg.files && msg.files.length > 0) {
-                     msg.files.forEach(f => allSources.push(f.name));
-                 }
-             });
+    const allSources = sentFiles.filter(f => f.name).map(f => f.name);
+    const report = await createReport({
+      title,
+      type: 'open_report',
+      content: content || '# 空报告\nAI 未返回任何内容，请稍后重试或手动编辑。',
+      sources: allSources,
+    });
 
-             const newReport = {
-                id: newReportId,
-                title: '新建报告',
-                create_time: new Date().toLocaleDateString(),
-                content: finalContent,
-                sources: allSources
-             };
-             store.addReport(newReport);
-             
-             // Use replace instead of push to prevent back-navigation to generating state? 
-             // Push is fine.
-             router.push(`/editor/${newReportId}`).then(() => {
-                 // Navigation success
-                 // Component will unmount, so isGenerating doesn't matter much unless keep-alive
-             }).catch(err => {
-                 console.error('Navigation error:', err);
-                 isGenerating.value = false;
-                 alert('页面跳转失败: ' + err.message);
-             });
-           } catch (e) {
-               console.error('Report creation failed:', e);
-               isGenerating.value = false;
-               alert('报告创建异常: ' + e.message);
-           }
-       }, 2200);
-
-                }, 2000); 
-            }
-        }, speed);
-
-  }, 3000); // 模拟 3秒 思考时间
+    if (report?.id) {
+      store.addReport({
+        id: report.id,
+        title: report.title,
+        create_time: report.create_time || new Date().toLocaleDateString(),
+        content: report.content,
+        sources: report.sources || [],
+      });
+    }
+    await router.push(`/editor/${report.id}`);
+  } catch (e) {
+    console.error('开放报告创建失败:', e);
+    isGenerating.value = false;
+    messages.value.push({
+      role: 'ai',
+      content: `报告创建失败，请稍后重试。\n\n错误信息：${e.message || e}`,
+    });
+    await scrollToBottom();
+  }
 };
 
 // 监听回车键
@@ -355,12 +518,53 @@ const onKeydown = (e) => {
         class="flex flex-col gap-2 max-w-3xl mx-auto animate-fade-in"
         :class="msg.role === 'user' ? 'items-end' : 'items-start'"
       >
-        <div v-if="msg.role === 'ai'" class="flex items-start gap-3">
+        <div v-if="msg.role === 'ai'" class="flex items-start gap-3 w-full">
           <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0">
             <Icon icon="ri:robot-2-line" class="text-lg" />
           </div>
-          <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
-            <div class="text-sm leading-relaxed text-slate-700 markdown-content" v-html="renderMarkdown(msg.content)"></div>
+          <div class="flex-1 min-w-0 space-y-3">
+            <div v-if="msg.content" class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
+              <div class="text-sm leading-relaxed text-slate-700 markdown-content" v-html="renderMarkdown(msg.content)"></div>
+            </div>
+            <!-- 检索结果展示：供用户确认 -->
+            <div v-if="msg.searchResults" class="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-500">检索词：{{ msg.searchResults.query }}</span>
+              </div>
+              <div class="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                <a
+                  v-for="(r, i) in msg.searchResults.results"
+                  :key="i"
+                  :href="r.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block px-4 py-3 hover:bg-slate-50/80 transition-colors text-left group"
+                >
+                  <div class="text-sm font-medium text-slate-800 group-hover:text-blue-600 truncate">{{ r.title || '无标题' }}</div>
+                  <div class="text-xs text-slate-500 mt-1 line-clamp-2">{{ r.snippet }}</div>
+                  <div class="text-xs text-blue-500 mt-1 truncate">{{ r.url }}</div>
+                </a>
+              </div>
+              <div class="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-4">
+                <button
+                  v-if="msg.searchResults.results.length > 0"
+                  @click="confirmWithoutSearch(msg)"
+                  :disabled="isGenerating"
+                  class="text-xs text-slate-500 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  不使用检索结果，直接生成
+                </button>
+                <div v-else></div>
+                <button
+                  @click="confirmAndGenerate(msg)"
+                  :disabled="isGenerating"
+                  class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2 shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Icon icon="ri:check-line" class="text-lg" />
+                  {{ msg.searchResults.results.length > 0 ? '确认并生成报告' : '直接生成报告' }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -402,7 +606,7 @@ const onKeydown = (e) => {
            <Icon icon="ri:robot-2-line" class="text-lg animate-pulse" />
          </div>
          <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 flex items-center">
-           <span class="text-sm text-slate-500 mr-2">正在分析文档...</span>
+           <span class="text-sm text-slate-500 mr-2">{{ isWebSearchEnabled ? '正在检索网络...' : '正在分析文档...' }}</span>
            <div class="flex gap-1">
              <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
              <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
